@@ -15,12 +15,11 @@ import me.dvyy.sqlite.tables.TableReading
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-//TODO handle separate connections for async reads and single write
 open class Database(
     private val driver: BundledSQLiteDriver,
     private val readConnections: Int = 4,
     private val path: String,
-    val defaultIdentity: Identity? = null,
+    val defaultIdentity: Identity? = 0,
     val watchQueryThrottle: Duration = 100.milliseconds
 ) {
     val writeConnection = createConnection(readOnly = false)

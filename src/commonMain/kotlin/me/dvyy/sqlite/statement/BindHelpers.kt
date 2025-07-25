@@ -1,4 +1,4 @@
-package me.dvyy.sqlite.binds
+package me.dvyy.sqlite.statement
 
 import androidx.sqlite.SQLiteStatement
 import kotlin.uuid.ExperimentalUuidApi
@@ -21,4 +21,13 @@ fun SQLiteStatement.bindAny(index: Int, value: Any) = when (value) {
     is ByteArray -> bindBlob(index, value)
     is Uuid -> bindUuid(index, value)
     else -> error("Could not bind parameter of type ${value::class.simpleName}")
+}
+
+inline fun SQLiteStatement.bindParams(vararg params: Any) {
+    var index = 0
+    val size = params.size
+
+    while (index < size) {
+        bindAny(index + 1, params[index++])
+    }
 }

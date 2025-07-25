@@ -1,4 +1,4 @@
-package me.dvyy.sqlite.binds
+package me.dvyy.sqlite.statement
 
 import androidx.sqlite.SQLiteStatement
 

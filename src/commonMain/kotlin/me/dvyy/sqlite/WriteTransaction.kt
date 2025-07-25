@@ -3,7 +3,6 @@ package me.dvyy.sqlite
 import androidx.sqlite.SQLiteConnection
 import me.dvyy.sqlite.tables.Table
 import me.dvyy.sqlite.tables.TableReading
-import org.intellij.lang.annotations.Language
 import kotlin.coroutines.RestrictsSuspension
 
 @RestrictsSuspension

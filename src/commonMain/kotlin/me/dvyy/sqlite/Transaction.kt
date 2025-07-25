@@ -1,9 +1,9 @@
 package me.dvyy.sqlite
 
 import androidx.sqlite.SQLiteConnection
-import androidx.sqlite.SQLiteStatement
-import me.dvyy.sqlite.binds.NamedColumnSqliteStatement
-import me.dvyy.sqlite.binds.bindAny
+import me.dvyy.sqlite.statement.NamedColumnSqliteStatement
+import me.dvyy.sqlite.statement.bindParams
+import me.dvyy.sqlite.statement.SelectStatement
 import org.intellij.lang.annotations.Language
 import kotlin.coroutines.RestrictsSuspension
 
@@ -22,9 +22,6 @@ open class Transaction(
         }
     }
 
-    inline fun SQLiteStatement.bindParams(vararg params: Any) {
-        params.forEachIndexed { i, it -> bindAny(i + 1, it) }
-    }
 
     inline fun <T> getSingle(
         @Language("SQLite") sql: String,
@@ -58,6 +55,11 @@ open class Transaction(
             }
         }
     }
+
+    fun select(
+        @Language("SQLite") sql: String,
+        vararg parameters: Any,
+    ): SelectStatement = SelectStatement(sql, parameters)
 
     inline fun <T> forEach(@Language("SQLite") sql: String, statement: NamedColumnSqliteStatement.() -> T) {
         prepare(sql) {
