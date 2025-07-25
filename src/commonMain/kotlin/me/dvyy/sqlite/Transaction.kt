@@ -2,6 +2,7 @@ package me.dvyy.sqlite
 
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteStatement
+import me.dvyy.sqlite.binds.NamedColumnSqliteStatement
 import me.dvyy.sqlite.binds.bindAny
 import org.intellij.lang.annotations.Language
 import kotlin.coroutines.RestrictsSuspension
@@ -14,10 +15,10 @@ open class Transaction(
 ) {
     inline fun <T> prepare(
         @Language("SQLite") sql: String,
-        statement: SQLiteStatement.() -> T,
+        statement: NamedColumnSqliteStatement.() -> T,
     ): T {
         return connection.prepare(sql).use {
-            statement(it)
+            statement(NamedColumnSqliteStatement(it))
         }
     }
 
@@ -28,7 +29,7 @@ open class Transaction(
     inline fun <T> getSingle(
         @Language("SQLite") sql: String,
         vararg parameters: Any,
-        statement: SQLiteStatement.() -> T,
+        statement: NamedColumnSqliteStatement.() -> T,
     ): T = prepare(sql) {
         bindParams(*parameters)
         step()
@@ -38,7 +39,7 @@ open class Transaction(
     inline fun <T> getOrNull(
         @Language("SQLite") sql: String,
         vararg parameters: Any,
-        statement: SQLiteStatement.() -> T,
+        statement: NamedColumnSqliteStatement.() -> T,
     ): T? = prepare(sql) {
         bindParams(*parameters)
         if (!step()) return null
@@ -48,7 +49,7 @@ open class Transaction(
     inline fun <T> getList(
         @Language("SQLite") sql: String,
         vararg parameters: Any,
-        statement: SQLiteStatement.() -> T,
+        statement: NamedColumnSqliteStatement.() -> T,
     ): List<T> = buildList {
         prepare(sql) {
             bindParams(*parameters)
@@ -58,7 +59,7 @@ open class Transaction(
         }
     }
 
-    inline fun <T> forEach(@Language("SQLite") sql: String, statement: SQLiteStatement.() -> T) {
+    inline fun <T> forEach(@Language("SQLite") sql: String, statement: NamedColumnSqliteStatement.() -> T) {
         prepare(sql) {
             while (step()) {
                 statement()

@@ -18,6 +18,6 @@ open class Table(
     }
 
     companion object {
-        val nameRegex = "CREATE TABLE (?:IF NOT EXISTS\\s+)?(\\w+)".toRegex()
+        val nameRegex = "CREATE .*TABLE (?:IF NOT EXISTS\\s+)?(\\w+)".toRegex()
     }
 }

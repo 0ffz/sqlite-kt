@@ -3,7 +3,7 @@ plugins {
     `maven-publish`
 }
 
-group = "me.dvyy.sqlite"
+group = "me.dvyy"
 version = "0.0.1"
 
 repositories {
@@ -35,6 +35,11 @@ publishing {
         maven {
             name = "mineinabyss"
             url = uri("https://repo.mineinabyss.com/releases")
+            credentials(PasswordCredentials::class)
+        }
+        maven {
+            name = "mineinabyssSnapshots"
+            url = uri("https://repo.mineinabyss.com/snapshots")
             credentials(PasswordCredentials::class)
         }
     }
