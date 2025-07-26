@@ -10,7 +10,7 @@ import me.dvyy.sqlite.statement.NamedColumnSqliteStatement
  */
 class PrepareCachingSQLiteConnection(
     val sqliteConnection: SQLiteConnection,
-    private val prepareCacheSize: Int = 4,
+    private val prepareCacheSize: Int = 16,
 ) : SQLiteConnection by sqliteConnection {
     private val preparedStrings = Array(prepareCacheSize) { "" }
 
@@ -30,14 +30,14 @@ class PrepareCachingSQLiteConnection(
 
         val prepared = NamedColumnSqliteStatement(sqliteConnection.prepare(sql))
         val nextIndex = index++ % prepareCacheSize
-        preparedStatements[nextIndex].close()
+        preparedStatements[nextIndex].finalizeStatement()
         preparedStatements[nextIndex] = prepared
         preparedStrings[nextIndex] = sql
         return prepared
     }
 
     override fun close() {
-        preparedStatements.forEach { it.close() }
+        preparedStatements.forEach { it.finalizeStatement() }
         sqliteConnection.close()
     }
 }

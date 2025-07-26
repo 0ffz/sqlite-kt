@@ -4,6 +4,7 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteException
 import io.kotest.assertions.throwables.shouldNotThrow
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -50,6 +51,26 @@ class ConnectionPoolTests {
         db.close()
     }
 
+    @Test
+    fun `should correctly cache prepared statemetns`() = runTest {
+        val db = Database(
+            path = "test.db",
+        )
+
+        db.read {
+            repeat(100) {
+                getSingle("SELECT $it") { getInt(0) } shouldBe it
+                getSingle("SELECT $it") { getInt(0) } shouldBe it
+            }
+        }
+
+        db.write {
+            repeat(100) {
+                getSingle("SELECT $it") { getInt(0) } shouldBe it
+                getSingle("SELECT $it") { getInt(0) } shouldBe it
+            }
+        }
+    }
 //    @Test
 //    fun `read performance`() = runTest {
 //        Database(path = "test.db").use { db ->

@@ -28,4 +28,12 @@ class NamedColumnSqliteStatement(
     fun getDouble(column: String): Double = getDouble(indexOf(column))
 
     fun getBlob(column: String): ByteArray = getBlob(indexOf(column))
+
+    override fun close() {
+        // Finalize handled by prepare caching sqlite connection
+    }
+
+    fun finalizeStatement() {
+        statement.close()
+    }
 }

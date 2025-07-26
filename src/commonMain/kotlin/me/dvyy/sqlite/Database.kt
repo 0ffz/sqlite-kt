@@ -97,7 +97,7 @@ open class Database(
      * Gets or creates a read-only connection for this thread.
      * User must ensure not to pass it to other threads.
      */
-    fun getOrCreateReadConnectionForCurrentThread(): SQLiteConnection {
+    fun getOrCreateReadConnectionForCurrentThread(): PrepareCachingSQLiteConnection {
         return threadLocalReadOnlyConnection.get()
     }
 
