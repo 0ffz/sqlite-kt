@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "me.dvyy"
-version = "0.0.2-alpha.1"
+version = "0.0.2-alpha.2"
 
 repositories {
     mavenCentral()
@@ -25,6 +25,13 @@ kotlin {
                     api(libs.androidx.sqlite)
                     implementation(libs.kotlinx.coroutines.core)
                 }
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.kotest.assertions)
             }
         }
     }

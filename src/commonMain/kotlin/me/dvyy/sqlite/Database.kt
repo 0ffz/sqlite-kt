@@ -3,39 +3,84 @@ package me.dvyy.sqlite
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.driver.bundled.*
 import androidx.sqlite.execSQL
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
+import kotlinx.coroutines.channels.consume
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.newFixedThreadPoolContext
-import kotlinx.coroutines.newSingleThreadContext
-import kotlinx.coroutines.withContext
-import me.dvyy.sqlite.observers.DatabaseObservers
 import me.dvyy.sqlite.internal.throttle
 import me.dvyy.sqlite.internal.transaction
+import me.dvyy.sqlite.observers.DatabaseObservers
 import me.dvyy.sqlite.tables.TableReading
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * A simple sqlite database connection pool in WAL mode.
+ * Backed by a single write connection and fixed thread pool of read connections.
+ *
+ * @property parentScope If provided, closes all database connections and cancels running jobs when this scope cancels its children.
+ */
 open class Database(
-    private val driver: BundledSQLiteDriver,
-    private val readConnections: Int = 4,
     private val path: String,
-    val defaultIdentity: Identity? = 0,
-    val watchQueryThrottle: Duration = 100.milliseconds
-) {
-    val writeConnection = createConnection(readOnly = false)
-    val readerConnectionPool = Channel<Lazy<SQLiteConnection>>(readConnections)
-    val dbWriteDispatcher = newSingleThreadContext("db-writes")
-    val dbReadDispatcher = newFixedThreadPoolContext(readConnections, "db-reads")
-    val observers = DatabaseObservers()
+    private val driver: BundledSQLiteDriver = BundledSQLiteDriver(),
+    private val readConnections: Int = 4,
+    val defaultIdentity: Identity? = -1,
+    val watchQueryThrottle: Duration = 100.milliseconds,
+    val parentScope: CoroutineScope? = null,
+    init: WriteTransaction.() -> Unit = {},
+) : AutoCloseable {
+    @PublishedApi
+    internal val writeConnection = createConnection(readOnly = false).apply {
+        val tx = WriteTransaction(this, defaultIdentity ?: -1)
+        transaction {
+            init(tx)
+        }
+    }
 
-    fun createConnection(readOnly: Boolean): SQLiteConnection {
-        //FIXME readonly errors
-        val readFlag = if (readOnly) SQLITE_OPEN_READONLY else SQLITE_OPEN_READWRITE
+    @PublishedApi
+    internal val dbWriteDispatcher = newSingleThreadContext("db-writes")
+
+    @PublishedApi
+    internal val dbReadDispatcher = newFixedThreadPoolContext(readConnections, "db-reads")
+
+    @PublishedApi
+    internal val createdReadConnections = Channel<SQLiteConnection>(capacity = UNLIMITED)
+
+    @PublishedApi
+    internal val observers = DatabaseObservers()
+
+    private var isClosed = false
+
+    // TODO use multiplatform ThreadLocal like koin does (uses Stately library outside JVM)
+    //  https://github.com/InsertKoinIO/koin/blob/main/projects/core/koin-core/build.gradle.kts
+    @PublishedApi
+    internal val threadLocalReadOnlyConnection: ThreadLocal<SQLiteConnection> =
+        ThreadLocal.withInitial { createConnection(readOnly = true) }
+
+    init {
+        // Close the database when the parent scope is cancelled
+        parentScope?.launch {
+            try {
+                awaitCancellation()
+            } finally {
+                this@Database.close()
+            }
+        }
+    }
+
+    /**
+     * Creates a new connection in WAL mode, specifying [SQLITE_OPEN_READONLY] flag if [readOnly].
+     *
+     * This connection opens with [SQLITE_OPEN_NOMUTEX], so ensure only a single thread can
+     * prepare and run statements with it at a time.
+     */
+    @PublishedApi
+    internal fun createConnection(readOnly: Boolean): SQLiteConnection {
+        val readFlag = if (readOnly) SQLITE_OPEN_READONLY else (SQLITE_OPEN_READWRITE or SQLITE_OPEN_CREATE)
         return driver.open(
-                path,
-                SQLITE_OPEN_READWRITE or SQLITE_OPEN_CREATE or SQLITE_OPEN_NOMUTEX
-            )
-        .also {
+            path, readFlag or SQLITE_OPEN_NOMUTEX
+        ).also {
             it.execSQL(
                 """
                 PRAGMA journal_mode=WAL;
@@ -43,18 +88,20 @@ open class Database(
                 PRAGMA journal_size_limit=6144000;
                 """.trimIndent()
             )
+            if (readOnly) createdReadConnections.trySend(it)
         }
     }
 
-    init {
-        repeat(readConnections) {
-            readerConnectionPool.trySend(
-                lazy { createConnection(readOnly = true) }
-            )
-        }
+    /**
+     * Gets or creates a read-only connection for this thread.
+     * User must ensure not to pass it to other threads.
+     */
+    fun getOrCreateReadConnectionForCurrentThread(): SQLiteConnection {
+        return threadLocalReadOnlyConnection.get()
     }
 
     // TODO need SupervisorJob? Check this is safe with parallel writes
+    /** Run a write inside a transaction on the single database write connection. */
     suspend inline fun <T> write(
         identity: Identity = defaultIdentity ?: error("Identity must be specified when writing"),
         crossinline block: WriteTransaction.() -> T,
@@ -65,19 +112,15 @@ open class Database(
         }.also { observers.notify(tx.modifiedTables) }
     }
 
+    /** Run a database read on read thread pool. */
     suspend inline fun <T> read(
         crossinline block: Transaction.() -> T,
-    ): T {
-        val conn = readerConnectionPool.receive().value
-        try {
-            return withContext(dbReadDispatcher) {
-                Transaction(conn).block()
-            }
-        } finally {
-            readerConnectionPool.send(lazy { conn })
-        }
+    ): T = withContext(dbReadDispatcher) {
+        val conn = threadLocalReadOnlyConnection.get()
+        Transaction(conn).block()
     }
 
+    /** Watches tables associated with a query for changes (this API is not complete yet.) */
     inline fun <T> watch(
         vararg tables: TableReading,
         crossinline read: Transaction.() -> T,
@@ -86,5 +129,24 @@ open class Database(
         observers.forTables(TableReading.reduce(tables.toSet())).throttle(watchQueryThrottle).collect {
             emit(read { read() })
         }
+    }
+
+    /** Closes all read/write dispatchers, and their connections. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun close() {
+        if (isClosed) return
+
+        // Close dispatchers
+        dbWriteDispatcher.close()
+        dbReadDispatcher.close()
+
+        // Close read and write sqlite connections
+        writeConnection.close()
+        createdReadConnections.consume {
+            while (!isEmpty) {
+                tryReceive().getOrNull()?.close()
+            }
+        }
+        isClosed = true
     }
 }
