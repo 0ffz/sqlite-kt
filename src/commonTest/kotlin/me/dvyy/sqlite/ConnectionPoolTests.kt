@@ -2,7 +2,6 @@ package me.dvyy.sqlite
 
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteException
-import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import io.kotest.assertions.throwables.shouldNotThrow
 import io.kotest.assertions.throwables.shouldThrow
 import kotlinx.coroutines.Dispatchers
@@ -10,6 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.test.Test
+import kotlin.time.measureTime
 
 class ConnectionPoolTests {
     @Test
@@ -49,4 +49,24 @@ class ConnectionPoolTests {
         }
         db.close()
     }
+
+//    @Test
+//    fun `read performance`() = runTest {
+//        Database(path = "test.db").use { db ->
+//            db.read {
+//                measureTime {
+//                    repeat(1000000) {
+//                        prepare("SELECT data ->> 'test' FROM test") {
+//                            while (step()) {
+//                                getInt(0)
+//                            }
+//                            reset()
+//                        }
+//                    }
+////                        getSingle("SELECT * FROM test") { getInt(0) }
+////                    }
+//                }.let { println(it) }
+//            }
+//        }
+//    }
 }

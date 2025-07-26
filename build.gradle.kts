@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "me.dvyy"
-version = "0.0.2-alpha.2"
+version = "0.0.2-alpha.3"
 
 repositories {
     mavenCentral()

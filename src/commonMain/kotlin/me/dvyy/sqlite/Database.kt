@@ -8,6 +8,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
 import kotlinx.coroutines.channels.consume
 import kotlinx.coroutines.flow.flow
+import me.dvyy.sqlite.connection.PrepareCachingSQLiteConnection
 import me.dvyy.sqlite.internal.throttle
 import me.dvyy.sqlite.internal.transaction
 import me.dvyy.sqlite.observers.DatabaseObservers
@@ -55,7 +56,7 @@ open class Database(
     // TODO use multiplatform ThreadLocal like koin does (uses Stately library outside JVM)
     //  https://github.com/InsertKoinIO/koin/blob/main/projects/core/koin-core/build.gradle.kts
     @PublishedApi
-    internal val threadLocalReadOnlyConnection: ThreadLocal<SQLiteConnection> =
+    internal val threadLocalReadOnlyConnection: ThreadLocal<PrepareCachingSQLiteConnection> =
         ThreadLocal.withInitial { createConnection(readOnly = true) }
 
     init {
@@ -76,7 +77,7 @@ open class Database(
      * prepare and run statements with it at a time.
      */
     @PublishedApi
-    internal fun createConnection(readOnly: Boolean): SQLiteConnection {
+    internal fun createConnection(readOnly: Boolean): PrepareCachingSQLiteConnection {
         val readFlag = if (readOnly) SQLITE_OPEN_READONLY else (SQLITE_OPEN_READWRITE or SQLITE_OPEN_CREATE)
         return driver.open(
             path, readFlag or SQLITE_OPEN_NOMUTEX
@@ -89,7 +90,7 @@ open class Database(
                 """.trimIndent()
             )
             if (readOnly) createdReadConnections.trySend(it)
-        }
+        }.let { PrepareCachingSQLiteConnection(it) }
     }
 
     /**

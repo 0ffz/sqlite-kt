@@ -1,13 +1,13 @@
 package me.dvyy.sqlite
 
-import androidx.sqlite.SQLiteConnection
+import me.dvyy.sqlite.connection.PrepareCachingSQLiteConnection
 import me.dvyy.sqlite.tables.Table
 import me.dvyy.sqlite.tables.TableReading
 import kotlin.coroutines.RestrictsSuspension
 
 @RestrictsSuspension
 class WriteTransaction(
-    connection: SQLiteConnection,
+    connection: PrepareCachingSQLiteConnection,
     val identity: Identity,
 ) : Transaction(connection) {
     val modifiedTables = mutableSetOf<Table>()
