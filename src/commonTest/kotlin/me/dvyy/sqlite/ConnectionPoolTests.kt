@@ -52,7 +52,7 @@ class ConnectionPoolTests {
     }
 
     @Test
-    fun `should correctly cache prepared statemetns`() = runTest {
+    fun `should correctly cache prepared statements`() = runTest {
         val db = Database(
             path = "test.db",
         )
@@ -71,6 +71,25 @@ class ConnectionPoolTests {
             }
         }
     }
+
+    @Test
+    fun `should finalize old prepared statements`() = runTest {
+        val db = Database(
+            path = "test.db",
+        )
+        db.write {
+            val preparedStatements = (0..100).map {
+                getSingle("SELECT $it") { this }
+            }
+            shouldThrow<SQLiteException> {
+                preparedStatements.first().reset()
+            }
+            shouldNotThrow<SQLiteException> {
+                preparedStatements.last().reset()
+            }
+        }
+    }
+
 //    @Test
 //    fun `read performance`() = runTest {
 //        Database(path = "test.db").use { db ->
