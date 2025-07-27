@@ -15,7 +15,7 @@ import kotlin.time.measureTime
 class ConnectionPoolTests {
     @Test
     fun `each thread should reuse the same connection`() = runTest {
-        val db = Database(path = "test.db")
+        val db = Database.temporary()
         val entries = ConcurrentLinkedQueue<Pair<Thread, SQLiteConnection>>()
         repeat(1000) {
             launch(Dispatchers.IO) {
@@ -34,9 +34,7 @@ class ConnectionPoolTests {
 
     @Test
     fun `readOnly connection should not allow writes`() = runTest {
-        val db = Database(
-            path = "test.db",
-        )
+        val db = Database.temporary()
         shouldNotThrow<SQLiteException> {
             db.read {
                 getSingle("SELECT 'test'") { getText(0) }
@@ -52,10 +50,22 @@ class ConnectionPoolTests {
     }
 
     @Test
+    fun `in memory databse should correctly store data with read-write`() = runTest {
+        val db = Database.inMemorySingleConnection()
+        db.write {
+            exec("CREATE TABLE test (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+            exec("INSERT INTO test VALUES (1)")
+        }
+        db.read {
+            getSingle("SELECT * FROM test") {
+                getInt(0) shouldBe 1
+            }
+        }
+    }
+
+    @Test
     fun `should correctly cache prepared statements`() = runTest {
-        val db = Database(
-            path = "test.db",
-        )
+        val db = Database.temporary()
 
         db.read {
             repeat(100) {
@@ -74,9 +84,7 @@ class ConnectionPoolTests {
 
     @Test
     fun `should finalize old prepared statements`() = runTest {
-        val db = Database(
-            path = "test.db",
-        )
+        val db = Database.temporary()
         db.write {
             val preparedStatements = (0..100).map {
                 getSingle("SELECT $it") { this }

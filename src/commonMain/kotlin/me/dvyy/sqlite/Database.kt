@@ -25,7 +25,7 @@ import kotlin.time.Duration.Companion.milliseconds
 open class Database(
     private val path: String,
     private val driver: BundledSQLiteDriver = BundledSQLiteDriver(),
-    private val readConnections: Int = 4,
+    val readConnections: Int = 4,
     val defaultIdentity: Identity? = -1,
     val watchQueryThrottle: Duration = 100.milliseconds,
     val parentScope: CoroutineScope? = null,
@@ -43,7 +43,9 @@ open class Database(
     internal val dbWriteDispatcher = newSingleThreadContext("db-writes")
 
     @PublishedApi
-    internal val dbReadDispatcher = newFixedThreadPoolContext(readConnections, "db-reads")
+    internal val dbReadDispatcher =
+        if (readConnections == 0) dbWriteDispatcher
+        else newFixedThreadPoolContext(readConnections, "db-reads")
 
     @PublishedApi
     internal val createdReadConnections = Channel<SQLiteConnection>(capacity = UNLIMITED)
@@ -117,7 +119,8 @@ open class Database(
     suspend inline fun <T> read(
         crossinline block: Transaction.() -> T,
     ): T = withContext(dbReadDispatcher) {
-        val conn = threadLocalReadOnlyConnection.get()
+        val conn = if (readConnections == 0) writeConnection
+        else threadLocalReadOnlyConnection.get()
         Transaction(conn).block()
     }
 
@@ -149,5 +152,22 @@ open class Database(
             }
         }
         isClosed = true
+    }
+
+    companion object {
+        /**
+         * Creates a new temporary database which will be deleted once the write connection closes.
+         */
+        fun temporary(
+            readConnections: Int = 4,
+        ) = Database(
+            "",
+            readConnections = readConnections
+        )
+
+        /**
+         * Creates an in-memory database with a single read/write connection.
+         */
+        fun inMemorySingleConnection(): Database = Database(":memory:", readConnections = 0)
     }
 }
