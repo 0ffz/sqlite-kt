@@ -10,7 +10,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.test.Test
-import kotlin.time.measureTime
 
 class ConnectionPoolTests {
     @Test
@@ -50,7 +49,7 @@ class ConnectionPoolTests {
     }
 
     @Test
-    fun `in memory databse should correctly store data with read-write`() = runTest {
+    fun `in memory database should correctly store data with read-write`() = runTest {
         val db = Database.inMemorySingleConnection()
         db.write {
             exec("CREATE TABLE test (id INTEGER PRIMARY KEY AUTOINCREMENT)")
@@ -61,6 +60,21 @@ class ConnectionPoolTests {
                 getInt(0) shouldBe 1
             }
         }
+    }
+
+    @Test
+    fun `temporary database should correctly store data with read-write`() = runTest {
+        val db = Database.temporary()
+        db.write {
+            exec("CREATE TABLE test (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+            exec("INSERT INTO test VALUES (1)")
+        }
+        db.read {
+            getSingle("SELECT * FROM test") {
+                getInt(0) shouldBe 1
+            }
+        }
+        db.close()
     }
 
     @Test

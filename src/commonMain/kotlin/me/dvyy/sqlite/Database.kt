@@ -13,6 +13,12 @@ import me.dvyy.sqlite.internal.throttle
 import me.dvyy.sqlite.internal.transaction
 import me.dvyy.sqlite.observers.DatabaseObservers
 import me.dvyy.sqlite.tables.TableReading
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.createTempDirectory
+import kotlin.io.path.deleteRecursively
+import kotlin.io.path.div
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -29,6 +35,7 @@ open class Database(
     val defaultIdentity: Identity? = -1,
     val watchQueryThrottle: Duration = 100.milliseconds,
     val parentScope: CoroutineScope? = null,
+    val onClose: () -> Unit = {},
     init: WriteTransaction.() -> Unit = {},
 ) : AutoCloseable {
     @PublishedApi
@@ -151,6 +158,7 @@ open class Database(
                 tryReceive().getOrNull()?.close()
             }
         }
+        onClose()
         isClosed = true
     }
 
@@ -158,12 +166,18 @@ open class Database(
         /**
          * Creates a new temporary database which will be deleted once the write connection closes.
          */
+        @OptIn(ExperimentalPathApi::class)
         fun temporary(
             readConnections: Int = 4,
-        ) = Database(
-            "",
-            readConnections = readConnections
-        )
+        ): Database {
+            val tempDir = createTempDirectory("sqlite_kt")
+            val temporaryPath = tempDir / "test.db"
+            return Database(
+                temporaryPath.absolutePathString(),
+                readConnections = readConnections,
+                onClose = { tempDir.deleteRecursively() }
+            )
+        }
 
         /**
          * Creates an in-memory database with a single read/write connection.
