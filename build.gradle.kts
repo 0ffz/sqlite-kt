@@ -3,9 +3,6 @@ plugins {
     `maven-publish`
 }
 
-group = "me.dvyy"
-version = "0.0.2-alpha.4"
-
 repositories {
     mavenCentral()
     google()

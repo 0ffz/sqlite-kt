@@ -1,5 +1,6 @@
 package me.dvyy.sqlite
 
+import androidx.sqlite.SQLiteConnection
 import me.dvyy.sqlite.connection.PrepareCachingSQLiteConnection
 import me.dvyy.sqlite.statement.NamedColumnSqliteStatement
 import me.dvyy.sqlite.statement.SelectStatement
@@ -11,15 +12,14 @@ import kotlin.coroutines.RestrictsSuspension
 open class Transaction(
     @PublishedApi
     @JvmField
-    internal val connection: PrepareCachingSQLiteConnection,
+    internal val connection: SQLiteConnection,
 ) {
     inline fun <T> prepare(
         @Language("SQLite") sql: String,
         statement: NamedColumnSqliteStatement.() -> T,
-    ): T {
-        return statement((connection.prepare(sql)))
+    ): T = connection.prepare(sql).use {
+        statement.invoke(NamedColumnSqliteStatement(it))
     }
-
 
     inline fun <T> getSingle(
         @Language("SQLite") sql: String,

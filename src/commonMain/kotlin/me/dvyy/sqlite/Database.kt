@@ -65,7 +65,7 @@ open class Database(
     // TODO use multiplatform ThreadLocal like koin does (uses Stately library outside JVM)
     //  https://github.com/InsertKoinIO/koin/blob/main/projects/core/koin-core/build.gradle.kts
     @PublishedApi
-    internal val threadLocalReadOnlyConnection: ThreadLocal<PrepareCachingSQLiteConnection> =
+    internal val threadLocalReadOnlyConnection: ThreadLocal<SQLiteConnection> =
         ThreadLocal.withInitial { createConnection(readOnly = true) }
 
     init {
@@ -86,7 +86,7 @@ open class Database(
      * prepare and run statements with it at a time.
      */
     @PublishedApi
-    internal fun createConnection(readOnly: Boolean): PrepareCachingSQLiteConnection {
+    internal fun createConnection(readOnly: Boolean): SQLiteConnection {
         val readFlag = if (readOnly) SQLITE_OPEN_READONLY else (SQLITE_OPEN_READWRITE or SQLITE_OPEN_CREATE)
         return driver.open(
             path, readFlag or SQLITE_OPEN_NOMUTEX
@@ -99,14 +99,14 @@ open class Database(
                 """.trimIndent()
             )
             if (readOnly) createdReadConnections.trySend(it)
-        }.let { PrepareCachingSQLiteConnection(it) }
+        }
     }
 
     /**
      * Gets or creates a read-only connection for this thread.
      * User must ensure not to pass it to other threads.
      */
-    fun getOrCreateReadConnectionForCurrentThread(): PrepareCachingSQLiteConnection {
+    fun getOrCreateReadConnectionForCurrentThread(): SQLiteConnection {
         return threadLocalReadOnlyConnection.get()
     }
 
@@ -169,13 +169,15 @@ open class Database(
         @OptIn(ExperimentalPathApi::class)
         fun temporary(
             readConnections: Int = 4,
+            init: WriteTransaction.() -> Unit = {},
         ): Database {
             val tempDir = createTempDirectory("sqlite_kt")
             val temporaryPath = tempDir / "test.db"
             return Database(
                 temporaryPath.absolutePathString(),
                 readConnections = readConnections,
-                onClose = { tempDir.deleteRecursively() }
+                onClose = { tempDir.deleteRecursively() },
+                init = init
             )
         }
 

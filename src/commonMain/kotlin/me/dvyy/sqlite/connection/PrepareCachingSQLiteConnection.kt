@@ -30,14 +30,14 @@ class PrepareCachingSQLiteConnection(
 
         val prepared = NamedColumnSqliteStatement(sqliteConnection.prepare(sql))
         val nextIndex = index++ % prepareCacheSize
-        preparedStatements[nextIndex].finalizeStatement()
+//        preparedStatements[nextIndex].finalizeStatement()
         preparedStatements[nextIndex] = prepared
         preparedStrings[nextIndex] = sql
         return prepared
     }
 
     override fun close() {
-        preparedStatements.forEach { it.finalizeStatement() }
+//        preparedStatements.forEach { it.finalizeStatement() }
         sqliteConnection.close()
     }
 }
