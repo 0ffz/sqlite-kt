@@ -8,8 +8,8 @@ import kotlin.coroutines.RestrictsSuspension
 @RestrictsSuspension
 class WriteTransaction(
     connection: SQLiteConnection,
-    val identity: Identity,
-) : Transaction(connection) {
+    identity: Identity,
+) : Transaction(connection, identity) {
     val modifiedTables = mutableSetOf<Table>()
 
     //TODO complete modification api

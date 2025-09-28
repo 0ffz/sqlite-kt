@@ -1,7 +1,6 @@
 package me.dvyy.sqlite
 
 import androidx.sqlite.SQLiteConnection
-import me.dvyy.sqlite.connection.PrepareCachingSQLiteConnection
 import me.dvyy.sqlite.statement.NamedColumnSqliteStatement
 import me.dvyy.sqlite.statement.SelectStatement
 import me.dvyy.sqlite.statement.bindParams
@@ -13,6 +12,7 @@ open class Transaction(
     @PublishedApi
     @JvmField
     internal val connection: SQLiteConnection,
+    val identity: Identity,
 ) {
     inline fun <T> prepare(
         @Language("SQLite") sql: String,

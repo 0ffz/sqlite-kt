@@ -8,17 +8,11 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
 import kotlinx.coroutines.channels.consume
 import kotlinx.coroutines.flow.flow
-import me.dvyy.sqlite.connection.PrepareCachingSQLiteConnection
 import me.dvyy.sqlite.internal.throttle
 import me.dvyy.sqlite.internal.transaction
 import me.dvyy.sqlite.observers.DatabaseObservers
 import me.dvyy.sqlite.tables.TableReading
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.Path
-import kotlin.io.path.absolutePathString
-import kotlin.io.path.createTempDirectory
-import kotlin.io.path.deleteRecursively
-import kotlin.io.path.div
+import kotlin.io.path.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -124,11 +118,12 @@ open class Database(
 
     /** Run a database read on read thread pool. */
     suspend inline fun <T> read(
+        identity: Identity = defaultIdentity ?: error("Identity must be specified when writing"),
         crossinline block: Transaction.() -> T,
     ): T = withContext(dbReadDispatcher) {
         val conn = if (readConnections == 0) writeConnection
         else threadLocalReadOnlyConnection.get()
-        Transaction(conn).block()
+        Transaction(conn, identity).block()
     }
 
     /** Watches tables associated with a query for changes (this API is not complete yet.) */
