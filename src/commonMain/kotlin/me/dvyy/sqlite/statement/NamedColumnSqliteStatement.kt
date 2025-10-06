@@ -2,8 +2,8 @@ package me.dvyy.sqlite.statement
 
 import androidx.sqlite.SQLiteStatement
 
-class NamedColumnSqliteStatement(
-    val statement: SQLiteStatement,
+open class NamedColumnSqliteStatement(
+    private val statement: SQLiteStatement,
 ) : SQLiteStatement by statement {
     private val columnIndices = mutableMapOf<String, Int>()
 

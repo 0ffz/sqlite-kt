@@ -8,6 +8,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
 import kotlinx.coroutines.channels.consume
 import kotlinx.coroutines.flow.flow
+import me.dvyy.sqlite.connection.PrepareCachingSQLiteConnection
 import me.dvyy.sqlite.internal.throttle
 import me.dvyy.sqlite.internal.transaction
 import me.dvyy.sqlite.observers.DatabaseObservers
@@ -93,7 +94,7 @@ open class Database(
                 """.trimIndent()
             )
             if (readOnly) createdReadConnections.trySend(it)
-        }
+        }.let { PrepareCachingSQLiteConnection(it) }
     }
 
     /**

@@ -5,11 +5,14 @@ import androidx.sqlite.SQLiteException
 import io.kotest.assertions.throwables.shouldNotThrow
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.channels.ticker
 import kotlinx.coroutines.test.runTest
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.test.Test
+import kotlin.time.TimeSource
+import kotlin.time.measureTime
 
 class ConnectionPoolTests {
     @Test
@@ -114,7 +117,9 @@ class ConnectionPoolTests {
 
 //    @Test
 //    fun `read performance`() = runTest {
-//        Database(path = "test.db").use { db ->
+//        Database.temporary {
+//            exec("CREATE TABLE test (id INTEGER PRIMARY KEY AUTOINCREMENT, data BLOB)")
+//        }.use { db ->
 //            db.read {
 //                measureTime {
 //                    repeat(1000000) {
@@ -130,5 +135,40 @@ class ConnectionPoolTests {
 //                }.let { println(it) }
 //            }
 //        }
+//    }
+//
+//    @Test
+//    fun `context switch performance`() = runTest {
+//        Database.temporary {
+//            exec("CREATE TABLE test (id INTEGER PRIMARY KEY AUTOINCREMENT, data BLOB)")
+//        }.use { db ->
+//            val samples = 100000
+//            withContext(Dispatchers.IO) {
+//                measureTime {
+//                    repeat(samples) {
+//                        db.read {
+//                            prepare("SELECT 'asdf'") {
+//                                step()
+//                                getText(0)
+//                            }
+//                        }
+//                    }
+//                }.let { println("${it / samples} avg to db.read") }
+//            }
+//
+//            withContext(Dispatchers.IO) {
+//                measureTime {
+//                    db.read {
+//                        repeat(samples) {
+//                            prepare("SELECT 'asdf'") {
+//                                step()
+//                                getText(0)
+//                            }
+//                        }
+//                    }
+//                }.let { println("${it / samples} avg with single db.read") }
+//            }
+//        }
+//
 //    }
 }

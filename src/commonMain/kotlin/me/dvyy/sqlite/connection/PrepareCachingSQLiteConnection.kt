@@ -1,6 +1,7 @@
 package me.dvyy.sqlite.connection
 
 import androidx.sqlite.SQLiteConnection
+import me.dvyy.sqlite.statement.CachingSqliteStatement
 import me.dvyy.sqlite.statement.NamedColumnSqliteStatement
 
 /**
@@ -16,7 +17,7 @@ class PrepareCachingSQLiteConnection(
 
     // NoSQLiteStatement to avoid a null box
     private val preparedStatements = Array(prepareCacheSize) {
-        NamedColumnSqliteStatement(NoSQLiteStatement)
+        CachingSqliteStatement(NoSQLiteStatement)
     }
     private var index = 0
 
@@ -24,20 +25,20 @@ class PrepareCachingSQLiteConnection(
         val cached = preparedStrings.indexOf(sql)
         if (cached != -1) {
             val prepared = preparedStatements[cached]
-            prepared.reset()
-            return prepared
+            return CachingSqliteStatement(prepared)
         }
 
-        val prepared = NamedColumnSqliteStatement(sqliteConnection.prepare(sql))
+        val prepared = CachingSqliteStatement(sqliteConnection.prepare(sql))
+        val nameCaching = NamedColumnSqliteStatement(prepared)
         val nextIndex = index++ % prepareCacheSize
-//        preparedStatements[nextIndex].finalizeStatement()
+        preparedStatements[nextIndex].finalizeStatement()
         preparedStatements[nextIndex] = prepared
         preparedStrings[nextIndex] = sql
-        return prepared
+        return nameCaching
     }
 
     override fun close() {
-//        preparedStatements.forEach { it.finalizeStatement() }
+        preparedStatements.forEach { it.finalizeStatement() }
         sqliteConnection.close()
     }
 }
