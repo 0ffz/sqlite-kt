@@ -55,42 +55,6 @@ open class Database(
         }
     }
 
-    suspend fun trackChangesOn(table: String) {
-        write {
-            if (table in trackedTables) return@write
-            trackedTables.add(table)
-            val id = trackedTables.lastIndex
-            tableIndices[table] = id
-            exec(
-                """
-                CREATE TEMP TRIGGER IF NOT EXISTS [skt_reactive_insert_$table]
-                AFTER INSERT ON $table
-                BEGIN
-                    INSERT OR IGNORE INTO skt_table_modification_log VALUES ($id, 1);
-                END;
-            """.trimIndent()
-            )
-            exec(
-                """
-                CREATE TEMP TRIGGER IF NOT EXISTS [skt_reactive_update_$table]
-                AFTER UPDATE ON $table
-                BEGIN
-                    INSERT OR IGNORE INTO skt_table_modification_log VALUES ($id, 1);
-                END;
-            """.trimIndent()
-            )
-            exec(
-                """
-                CREATE TEMP TRIGGER IF NOT EXISTS [skt_reactive_delete_$table]
-                AFTER DELETE ON $table
-                BEGIN
-                    INSERT OR IGNORE INTO skt_table_modification_log VALUES ($id, 1);
-                END;
-            """.trimIndent()
-            )
-        }
-    }
-
     @PublishedApi
     internal val dbWriteDispatcher = newSingleThreadContext("db-writes")
 
@@ -107,9 +71,15 @@ open class Database(
 
     private var isClosed = false
 
+    /**
+     * Scope for launching transactions in this database, inherits [parentScope] if specified.
+     * Closing the database cancels this scope.
+     */
     @PublishedApi
-    internal val writeScope =
-        CoroutineScope((parentScope?.coroutineContext ?: Dispatchers.Default) + dbWriteDispatcher + SupervisorJob())
+    internal val scope = CoroutineScope((parentScope?.coroutineContext ?: Dispatchers.Default) + SupervisorJob())
+
+    @Deprecated("Binary compatibility, will be removed")
+    internal val writeScope = scope
 
     // TODO use multiplatform ThreadLocal like koin does (uses Stately library outside JVM)
     //  https://github.com/InsertKoinIO/koin/blob/main/projects/core/koin-core/build.gradle.kts
@@ -153,13 +123,12 @@ open class Database(
 
     /**
      * Gets or creates a read-only connection for this thread.
-     * User must ensure not to pass it to other threads.
+     * User must ensure not to pass it to other threads and .
      */
     fun getOrCreateReadConnectionForCurrentThread(): SQLiteConnection {
         return threadLocalReadOnlyConnection.get()
     }
 
-    // TODO need SupervisorJob? Check this is safe with parallel writes
     /** Run a write inside a transaction on the single database write connection. */
     suspend inline fun <T> write(
         identity: Identity = defaultIdentity ?: error("Identity must be specified when writing"),
@@ -188,13 +157,33 @@ open class Database(
         Transaction(conn, identity).block()
     }
 
+    /**
+     * Launches a read transaction on one of the read threads.
+     * Will not be cancelled if the current scope is cancelled as this is not a suspending function.
+     *
+     * Prefer [read] if already in a suspend function.
+     */
+    inline fun <T> launchRead(
+        identity: Identity = defaultIdentity ?: error("Identity must be specified when writing"),
+        crossinline block: Transaction.() -> T,
+    ): Job = scope.launch(dbReadDispatcher) {
+        read(identity, block)
+    }
+
+    /**
+     * Launches a write transaction on the write thread.
+     * Will not be cancelled if the current scope is cancelled as this is not a suspending function.
+     *
+     * Prefer [write] if already in a suspend function.
+     */
     inline fun <T> launchWrite(
         identity: Identity = defaultIdentity ?: error("Identity must be specified when writing"),
         crossinline block: WriteTransaction.() -> T,
-    ): Job = writeScope.launch {
+    ): Job = scope.launch(dbWriteDispatcher) {
         write(identity, block)
     }
 
+    //TODO watch changes only to a specific row
     /** Watches tables associated with a query for changes (this API is not complete yet.) */
     inline fun <T> watch(
         vararg tables: String,
@@ -209,6 +198,47 @@ open class Database(
         }
     }
 
+    /**
+     * Creates triggers keeping track of writes to the given [table].
+     *
+     * Necessary to be able to [watch] a table for changes
+     */
+    suspend fun trackChangesOn(table: String) {
+        write {
+            if (table in trackedTables) return@write
+            trackedTables.add(table)
+            val id = trackedTables.lastIndex
+            tableIndices[table] = id
+            exec(
+                """
+                CREATE TEMP TRIGGER IF NOT EXISTS [skt_reactive_insert_$table]
+                AFTER INSERT ON $table
+                BEGIN
+                    INSERT OR IGNORE INTO skt_table_modification_log VALUES ($id, 1);
+                END;
+            """.trimIndent()
+            )
+            exec(
+                """
+                CREATE TEMP TRIGGER IF NOT EXISTS [skt_reactive_update_$table]
+                AFTER UPDATE ON $table
+                BEGIN
+                    INSERT OR IGNORE INTO skt_table_modification_log VALUES ($id, 1);
+                END;
+            """.trimIndent()
+            )
+            exec(
+                """
+                CREATE TEMP TRIGGER IF NOT EXISTS [skt_reactive_delete_$table]
+                AFTER DELETE ON $table
+                BEGIN
+                    INSERT OR IGNORE INTO skt_table_modification_log VALUES ($id, 1);
+                END;
+            """.trimIndent()
+            )
+        }
+    }
+
     /** Closes all read/write dispatchers, and their connections. */
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun close() {
@@ -217,7 +247,7 @@ open class Database(
         // Close dispatchers
         dbWriteDispatcher.close()
         dbReadDispatcher.close()
-        writeScope.cancel()
+        scope.cancel()
 
         // Close read and write sqlite connections
         writeConnection.close()
