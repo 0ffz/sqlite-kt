@@ -19,11 +19,9 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                dependencies {
-                    api(miaLibs.androidx.sqlite.bundled)
-                    implementation(miaLibs.kotlinx.coroutines)
-                    implementation(libs.log4k)
-                }
+                api(miaLibs.androidx.sqlite.bundled)
+                implementation(miaLibs.kotlinx.coroutines)
+                implementation(libs.log4k)
             }
         }
         commonTest {

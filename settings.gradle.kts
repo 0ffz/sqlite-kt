@@ -25,6 +25,6 @@ dependencyResolutionManagement {
     }
 }
 
-include("codegen-plugin")
+include("codegen-plugin", "sqlite-kt-datastore")
 
 includeBuild("test-codegen")
