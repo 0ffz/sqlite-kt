@@ -62,8 +62,8 @@ open class DataStore<T>(
     ): Uuid {
         tx.exec(
             """
-            INSERT OR REPLACE INTO $table (id, data, owner) 
-            SELECT :id, jsonb(:data), -1
+            INSERT OR REPLACE INTO $table (id, data) 
+            SELECT :id, jsonb(:data)
             WHERE NOT EXISTS (SELECT 1 FROM $table WHERE id = :id AND data IS NOT null)
             """.trimIndent(), id, data.toString()
         )
@@ -93,15 +93,15 @@ open class DataStore<T>(
         val updated = tx.select(
             """
             UPDATE $table 
-            SET data = jsonb(:data), owner = -1
+            SET data = jsonb(:data)
             WHERE id = :id AND data IS NOT null
             """.trimIndent(), data.toString(), id
         ).anyChanged()
 
         if (!updated) tx.exec(
             """
-            INSERT INTO $table (id, data, owner) 
-            VALUES (:id, jsonb(:data), -1)
+            INSERT INTO $table (id, data) 
+            VALUES (:id, jsonb(:data))
             """.trimIndent(),
             id, data.toString()
         )
