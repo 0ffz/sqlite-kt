@@ -1,5 +1,6 @@
 plugins {
     alias(miaLibs.plugins.mia.kotlin.multiplatform)
+    alias(miaLibs.plugins.mia.publication)
     alias(miaLibs.plugins.kotlinx.serialization)
 }
 
