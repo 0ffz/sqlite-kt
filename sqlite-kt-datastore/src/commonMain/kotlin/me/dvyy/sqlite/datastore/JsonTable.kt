@@ -47,7 +47,7 @@ open class JsonTable(
             CREATE TABLE IF NOT EXISTS $name (
                 id BLOB PRIMARY KEY,
                 data BLOB CHECK (json_valid(data, 4)),
-                json_data TEXT GENERATED ALWAYS AS (json(data)) VIRTUAL,
+                json_data TEXT GENERATED ALWAYS AS (json(data)) VIRTUAL
             ) STRICT;
             """.trimIndent()
         )
